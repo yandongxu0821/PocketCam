@@ -10,7 +10,7 @@ if (keystorePropsFile.exists()) {
 }
 
 android {
-    namespace 'cn.sharinghub.pocketcam'
+    namespace 'cn.sharinghub.ipcam'
     compileSdk 37
     ndkVersion "23.2.8568313"
 
