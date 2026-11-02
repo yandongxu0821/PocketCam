@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 界面色板改为主题属性，布局与 drawable 通过 ?attr 引用，切换主题即可整体换色 -->
+    <attr name="colorTitleBar" format="color" />
+    <attr name="colorStatusBar" format="color" />
+    <attr name="colorWindow" format="color" />
+    <attr name="colorCard" format="color" />
+    <attr name="colorTextPrimary" format="color" />
+    <attr name="colorTextSecondary" format="color" />
+    <attr name="colorDivider" format="color" />
+    <attr name="colorAccentFill" format="color" />
+    <attr name="colorAccentFillPressed" format="color" />
+    <attr name="colorControlFill" format="color" />
+    <attr name="colorControlFillPressed" format="color" />
+    <attr name="colorDangerFill" format="color" />
+    <attr name="colorDangerFillPressed" format="color" />
+    <attr name="colorStatusOk" format="color" />
+    <attr name="colorStatusOff" format="color" />
+    <attr name="colorStatusError" format="color" />
+</resources>

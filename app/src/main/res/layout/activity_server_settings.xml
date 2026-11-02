@@ -1,0 +1,92 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:focusable="true"
+    android:focusableInTouchMode="true">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="16dp">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:background="@drawable/bg_card"
+            android:paddingLeft="16dp"
+            android:paddingRight="16dp"
+            android:paddingBottom="16dp">
+
+            <TextView style="@style/FieldLabel" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="HTTP 端口" android:textSize="15sp" android:textColor="?attr/colorTextPrimary" />
+            <EditText android:id="@+id/edit_http_port" android:layout_width="match_parent" android:layout_height="wrap_content" android:singleLine="true" android:inputType="number" android:hint="HTTP 端口，默认 8080" />
+
+            <View android:layout_width="match_parent" android:layout_height="1dp" android:background="?attr/colorDivider" android:layout_marginTop="12dp" />
+
+            <Switch
+                android:id="@+id/switch_rtsp"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:paddingTop="16dp"
+                android:paddingBottom="4dp"
+                android:text="启用 RTSP（H.264）"
+                android:textSize="15sp"
+                android:textColor="?attr/colorTextPrimary" />
+
+            <LinearLayout
+                android:id="@+id/rtsp_options"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical">
+
+                <LinearLayout
+                    android:id="@+id/rtsp_options_inner"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical">
+
+                    <TextView style="@style/FieldLabel"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="RTSP 端口"
+                        android:textSize="15sp"
+                        android:textColor="?attr/colorTextPrimary" />
+
+                    <EditText
+                        android:id="@+id/edit_rtsp_port"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:singleLine="true"
+                        android:inputType="number"
+                        android:hint="RTSP 端口，默认 8554" />
+
+                    <Switch
+                        android:id="@+id/switch_rtsp_udp"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:paddingTop="8dp"
+                        android:text="RTSP 使用 UDP 传输"
+                        android:textSize="15sp"
+                        android:textColor="?attr/colorTextPrimary" />
+                </LinearLayout>
+            </LinearLayout>
+        </LinearLayout>
+
+        <TextView style="@style/SectionHeader" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="凭据" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:background="@drawable/bg_card"
+            android:paddingLeft="16dp"
+            android:paddingRight="16dp"
+            android:paddingBottom="16dp">
+
+            <EditText android:id="@+id/edit_user" android:layout_width="match_parent" android:layout_height="wrap_content" android:singleLine="true" android:hint="用户名" android:layout_marginTop="8dp" />
+            <EditText android:id="@+id/edit_password" android:layout_width="match_parent" android:layout_height="wrap_content" android:singleLine="true" android:inputType="textPassword" android:hint="密码（至少 8 个字符）" />
+        </LinearLayout>
+    </LinearLayout>
+</ScrollView>

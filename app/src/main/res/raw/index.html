@@ -1,0 +1,185 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>{{TITLE}}</title>
+<link rel="icon" type="image/png" href="favicon.png">
+<link rel="apple-touch-icon" href="favicon.png">
+<style>
+:root { color-scheme: dark; }
+* { box-sizing: border-box; }
+body { margin: 0; background: #111; color: #eaeaea; font: 14px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+.wrap { max-width: 960px; margin: 0 auto; padding: 12px; }
+h1 { font-size: 16px; font-weight: 600; margin: 4px 0 10px; text-align: center; }
+#video { display: block; width: 100%; max-height: 70vh; object-fit: contain; background: #000; border-radius: 8px; transition: transform .2s ease; }
+.bar { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; justify-content: center; }
+.btn { background: #2a2a2e; color: #eaeaea; border: 1px solid #3a3a40; border-radius: 8px; padding: 9px 14px; font-size: 14px; cursor: pointer; }
+.btn:active { background: #3a3a42; }
+.dropdown { position: relative; }
+.menu { display: none; position: absolute; top: calc(100% + 6px); left: 0; z-index: 20; min-width: 190px; max-height: 240px; overflow: auto; background: #1d1d21; border: 1px solid #3a3a40; border-radius: 8px; padding: 4px 0; }
+.menu.open { display: block; }
+.menu ul { list-style: none; margin: 0; padding: 0; }
+.menu li a { display: block; padding: 8px 12px; color: #ddd; text-decoration: none; white-space: nowrap; }
+.menu li a:hover { background: #2a2a2e; }
+.menu li strong { padding: 8px 12px; display: block; color: #fff; }
+#toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); max-width: 90vw; padding: 10px 16px; border-radius: 8px; background: #333; color: #fff; opacity: 0; transition: opacity .2s; pointer-events: none; white-space: pre-wrap; }
+#toast.show { opacity: 1; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>{{TITLE}}</h1>
+  <img id="video" src="stream.mjpg" alt="实时视频">
+  <audio id="audio" src="audio.wav" autoplay playsinline preload="none"></audio>
+  <div class="bar">
+    <button class="btn" onclick="snapshot()">快照</button>
+    <button class="btn" onclick="toggleMute()">声音</button>
+    <div class="dropdown">
+      <button class="btn" onclick="showArchives()">存档 &#9662;</button>
+      <div class="menu" id="archives"><ul id="archiveList"></ul></div>
+    </div>
+    <button class="btn" onclick="serverInfo()">服务器信息</button>
+    <button class="btn" onclick="rotateVideo()">旋转</button>
+    <button class="btn" onclick="motion()">运动检测</button>
+    <button class="btn" onclick="light()">灯光</button>
+    <button class="btn" onclick="camswitch()">切换</button>
+    <div class="dropdown">
+      <button class="btn" onclick="showSizes()">分辨率 &#9662;</button>
+      <div class="menu" id="sizes"><ul id="sizeList"></ul></div>
+    </div>
+  </div>
+</div>
+<div id="toast"></div>
+<script>
+// All URLs stay relative so the page also works when a reverse proxy mounts it under a prefix.
+function get(path) {
+  return fetch(path, { cache: 'no-store', credentials: 'same-origin' })
+    .then(function (r) { return r.text(); });
+}
+
+var toastTimer;
+function show(message) {
+  var toast = document.getElementById('toast');
+  toast.textContent = message;
+  toast.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(function () { toast.classList.remove('show'); }, 3000);
+}
+
+function toggleMenu(id) {
+  var menus = document.querySelectorAll('.menu');
+  for (var i = 0; i < menus.length; i++) {
+    if (menus[i].id !== id) menus[i].classList.remove('open');
+  }
+  document.getElementById(id).classList.toggle('open');
+}
+
+document.addEventListener('click', function (event) {
+  if (!event.target.closest('.dropdown')) {
+    var menus = document.querySelectorAll('.menu');
+    for (var i = 0; i < menus.length; i++) menus[i].classList.remove('open');
+  }
+});
+
+// Used by the <li> markup returned from /size; mirrors the reference server's contract.
+function onItemClick(id) {
+  get(id).then(function (data) {
+    if (data) show(data);
+    else location.reload();
+  });
+  return false;
+}
+
+function snapshot() {
+  get('getsnapshot').then(show);
+}
+
+function serverInfo() {
+  get('serverinfo').then(show);
+}
+
+function motion() {
+  get('get_motion_status').then(function (status) {
+    if (status === '1') {
+      if (confirm('关闭运动检测 ?')) get('toggle_motion').then(function (data) { show(data || '已关闭运动检测'); });
+    } else if (status === '0') {
+      if (confirm('打开运动检测后，检测到运动时会自动录像并保存，可通过存档查看。10 秒内检测不到运动即自动停止。')) {
+        get('toggle_motion').then(function (data) { show(data || '已打开运动检测'); });
+      }
+    } else {
+      show('当前设备没有可用摄像头');
+    }
+  });
+}
+
+function light() {
+  get('light').then(function (data) { show(data || '已切换手电筒'); });
+}
+
+function camswitch() {
+  get('camswitch').then(function (data) {
+    if (data) show(data);
+    else location.reload();
+  });
+}
+
+function showArchives() {
+  get('getarchives').then(function (data) {
+    document.getElementById('archiveList').innerHTML = data;
+    toggleMenu('archives');
+  });
+}
+
+function showSizes() {
+  get('size').then(function (data) {
+    document.getElementById('sizeList').innerHTML = data;
+    toggleMenu('sizes');
+  });
+}
+
+var angle = 0;
+function rotateVideo() {
+  angle = (angle + 90) % 360;
+  var video = document.getElementById('video');
+  if (angle % 180 === 0) {
+    video.style.transform = 'rotate(' + angle + 'deg)';
+  } else {
+    // Swap the displayed box so a landscape frame still fits after a quarter turn.
+    var scale = video.clientHeight / video.clientWidth;
+    video.style.transform = 'rotate(' + angle + 'deg) scale(' + scale.toFixed(3) + ')';
+  }
+}
+
+// --- Audio streaming -------------------------------------------------------
+// Browsers block autoplay with sound until a user gesture. The audio element
+// points at /audio.wav (a never-ending WAV of live microphone PCM). We try to
+// play on load; if the browser blocks it, the first tap/click anywhere starts
+// playback. The "声音" button toggles mute.
+var audio = document.getElementById('audio');
+var audioArmed = true;
+function startAudio() {
+  var p = audio.play();
+  if (p && p.then) {
+    p.then(function () { audioArmed = false; }).catch(function () { /* still blocked */ });
+  }
+}
+startAudio();
+function onFirstGesture() {
+  startAudio();
+  if (!audioArmed) {
+    document.removeEventListener('click', onFirstGesture);
+    document.removeEventListener('touchstart', onFirstGesture);
+  }
+}
+document.addEventListener('click', onFirstGesture);
+document.addEventListener('touchstart', onFirstGesture);
+
+function toggleMute() {
+  if (audio.paused) startAudio();
+  audio.muted = !audio.muted;
+  show(audio.muted ? '已静音' : '声音已开启');
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,48 @@
+plugins {
+    id 'com.android.application'
+}
+
+// Release signing lives outside the repo (keystore.properties is git-ignored).
+def keystoreProps = new Properties()
+def keystorePropsFile = rootProject.file('keystore.properties')
+if (keystorePropsFile.exists()) {
+    keystorePropsFile.withInputStream { keystoreProps.load(it) }
+}
+
+android {
+    namespace 'cn.sharinghub.pocketcam'
+    compileSdk 37
+    ndkVersion "23.2.8568313"
+
+    signingConfigs {
+        release {
+            if (keystoreProps['storeFile']) {
+                storeFile file(keystoreProps['storeFile'])
+                storePassword keystoreProps['storePassword']
+                keyAlias keystoreProps['keyAlias']
+                keyPassword keystoreProps['keyPassword']
+            }
+        }
+    }
+
+    buildTypes {
+        release {
+            if (keystoreProps['storeFile']) signingConfig signingConfigs.release
+        }
+    }
+
+    defaultConfig {
+        applicationId 'cn.sharinghub.ipcam'
+        minSdk 17
+        //noinspection ExpiredTargetSdkVersion
+        targetSdk 25
+        versionCode 4
+        versionName '0.2.0'
+        //noinspection ChromeOsAbiSupport
+        ndk { abiFilters 'armeabi-v7a', 'arm64-v8a' }
+    }
+}
+
+dependencies {
+    implementation files('libs/frpcbridge.aar')
+}

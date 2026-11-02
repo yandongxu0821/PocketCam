@@ -1,0 +1,106 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="16dp">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:background="@drawable/bg_card"
+            android:paddingLeft="16dp"
+            android:paddingRight="16dp"
+            android:paddingBottom="16dp">
+
+            <Switch
+                android:id="@+id/switch_autostart"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:paddingTop="14dp"
+                android:paddingBottom="10dp"
+                android:text="开机后自动启动相机服务"
+                android:textSize="15sp"
+                android:textColor="?attr/colorTextPrimary" />
+
+            <Switch
+                android:id="@+id/switch_autostart_frpc"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:paddingTop="4dp"
+                android:paddingBottom="8dp"
+                android:text="开机后自动启动 Frpc 服务"
+                android:textSize="15sp"
+                android:textColor="?attr/colorTextPrimary" />
+
+            <TextView
+                android:id="@+id/autostart_info"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:paddingBottom="10dp"
+                android:textSize="12sp"
+                android:textColor="?attr/colorTextSecondary"
+                android:text="正在检测 root…" />
+
+            <Button
+                style="@style/AppButton"
+                android:id="@+id/btn_root_start"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="8dp"
+                android:visibility="gone"
+                android:text="root 立即启动服务" />
+
+            <Button
+                style="@style/AppButton"
+                android:id="@+id/btn_oem_autostart"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="8dp"
+                android:text="打开系统自启动设置" />
+
+            <Button
+                style="@style/AppButton"
+                android:id="@+id/btn_accessibility"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="开启无障碍辅助" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:orientation="vertical"
+            android:background="@drawable/bg_card"
+            android:paddingLeft="16dp"
+            android:paddingRight="16dp"
+            android:paddingBottom="2dp">
+
+            <Switch
+                android:id="@+id/switch_theme_auto"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:paddingTop="14dp"
+                android:paddingBottom="7dp"
+                android:text="跟随系统深色模式"
+                android:textSize="15sp"
+                android:textColor="?attr/colorTextPrimary" />
+
+            <Switch
+                android:id="@+id/switch_dark"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:paddingTop="7dp"
+                android:paddingBottom="14dp"
+                android:text="深色模式"
+                android:textSize="15sp"
+                android:textColor="?attr/colorTextPrimary" />
+        </LinearLayout>
+    </LinearLayout>
+</ScrollView>

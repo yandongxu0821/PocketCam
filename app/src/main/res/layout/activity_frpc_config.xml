@@ -1,0 +1,133 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:focusable="true"
+    android:focusableInTouchMode="true">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="16dp">
+
+        <TextView style="@style/SectionHeader" android:layout_width="match_parent" android:layout_height="wrap_content" android:paddingTop="0dp" android:text="状态" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:background="@drawable/bg_card"
+            android:padding="16dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical">
+
+                <View
+                    android:id="@+id/frpc_dot"
+                    android:layout_width="12dp"
+                    android:layout_height="12dp"
+                    android:layout_marginRight="10dp" />
+
+                <TextView
+                    android:id="@+id/kernel_status"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:textSize="16sp"
+                    android:textStyle="bold"
+                    android:textColor="?attr/colorTextPrimary" />
+            </LinearLayout>
+
+            <Button
+                android:id="@+id/btn_toggle"
+                android:layout_width="match_parent"
+                android:layout_height="52dp"
+                android:layout_marginTop="14dp"
+                android:background="@drawable/btn_primary"
+                android:textColor="#FFFFFF"
+                android:textSize="16sp"
+                android:text="启动公网映射" />
+
+            <TextView
+                android:id="@+id/risk_link"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:paddingTop="12dp"
+                android:text="查看公网传输风险提示"
+                android:textSize="14sp"
+                android:textColor="?attr/colorAccentFill" />
+        </LinearLayout>
+
+        <TextView style="@style/SectionHeader" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="向导" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:background="@drawable/bg_card"
+            android:paddingLeft="16dp" android:paddingRight="16dp" android:paddingBottom="16dp">
+
+            <TextView style="@style/FieldLabel" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="服务器地址" />
+            <EditText android:id="@+id/edit_server" android:layout_width="match_parent" android:layout_height="wrap_content" android:singleLine="true" android:hint="例如 frps.example.com" android:inputType="textUri" />
+
+            <TextView style="@style/FieldLabel" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="服务器端口（默认 7000）" />
+            <EditText android:id="@+id/edit_server_port" android:layout_width="match_parent" android:layout_height="wrap_content" android:singleLine="true" android:inputType="number" />
+
+            <TextView style="@style/FieldLabel" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="认证 Token（可留空）" />
+            <EditText android:id="@+id/edit_token" android:layout_width="match_parent" android:layout_height="wrap_content" android:singleLine="true" android:inputType="textPassword" />
+
+            <TextView style="@style/FieldLabel" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="映射方式"  android:layout_marginBottom="8dp"/>
+            <Spinner
+                android:id="@+id/spinner_mapping"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content" />
+
+            <TextView android:id="@+id/label_remote_port" style="@style/FieldLabel" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="远程映射端口" />
+            <EditText android:id="@+id/edit_remote_port" android:layout_width="match_parent" android:layout_height="wrap_content" android:singleLine="true" android:inputType="number" />
+
+            <TextView android:id="@+id/label_subdomain" style="@style/FieldLabel" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="子域名（配合 frps 的 subdomainHost）" />
+            <EditText android:id="@+id/edit_subdomain" android:layout_width="match_parent" android:layout_height="wrap_content" android:singleLine="true" android:hint="例如 mycam" android:inputType="text" />
+        </LinearLayout>
+
+        <TextView style="@style/SectionHeader" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="完整配置文件（优先于向导）" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:background="@drawable/bg_card"
+            android:paddingLeft="16dp" android:paddingRight="16dp" android:paddingBottom="16dp">
+
+            <EditText
+                android:id="@+id/edit_toml"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:hint="完整 frpc.toml"
+                android:gravity="top|left"
+                android:minLines="6"
+                android:typeface="monospace"
+                android:textSize="13sp" />
+
+            <Button
+                style="@style/AppButton"
+                android:id="@+id/btn_import"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:text="从设备导入 TOML 文件" />
+        </LinearLayout>
+
+        <TextView
+            android:id="@+id/status_text"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:paddingTop="12dp"
+            android:paddingBottom="12dp"
+            android:textSize="14sp"
+            android:textColor="?attr/colorTextSecondary" />
+    </LinearLayout>
+</ScrollView>

@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 默认使用浅色主题；运行时由 ThemeUtil 在 setContentView 之前按偏好切换 -->
+    <style name="AppTheme" parent="Theme.PocketCam.Light" />
+
+    <style name="Theme.PocketCam.Light" parent="android:Theme.Holo.Light">
+        <item name="android:windowBackground">@color/light_window_bg</item>
+        <item name="android:actionBarStyle">@style/AppActionBarLight</item>
+        <item name="android:textColorPrimary">@color/light_text_primary</item>
+        <item name="android:textColorSecondary">@color/light_text_secondary</item>
+        <item name="colorTitleBar">@color/light_title_bar</item>
+        <item name="colorStatusBar">@color/light_status_bar</item>
+        <item name="colorWindow">@color/light_window_bg</item>
+        <item name="colorCard">@color/light_card_bg</item>
+        <item name="colorTextPrimary">@color/light_text_primary</item>
+        <item name="colorTextSecondary">@color/light_text_secondary</item>
+        <item name="colorDivider">@color/light_divider</item>
+        <item name="colorAccentFill">@color/light_accent</item>
+        <item name="colorAccentFillPressed">@color/light_accent_dark</item>
+        <item name="colorControlFill">@color/light_control_fill</item>
+        <item name="colorControlFillPressed">@color/light_control_fill_pressed</item>
+        <item name="colorDangerFill">@color/light_danger</item>
+        <item name="colorDangerFillPressed">@color/light_danger_dark</item>
+        <item name="colorStatusOk">@color/light_status_ok</item>
+        <item name="colorStatusOff">@color/light_status_off</item>
+        <item name="colorStatusError">@color/light_status_error</item>
+    </style>
+
+    <style name="Theme.PocketCam.Dark" parent="android:Theme.Holo">
+        <item name="android:windowBackground">@color/dark_window_bg</item>
+        <item name="android:actionBarStyle">@style/AppActionBarDark</item>
+        <item name="android:textColorPrimary">@color/dark_text_primary</item>
+        <item name="android:textColorSecondary">@color/dark_text_secondary</item>
+        <item name="colorTitleBar">@color/dark_title_bar</item>
+        <item name="colorStatusBar">@color/dark_status_bar</item>
+        <item name="colorWindow">@color/dark_window_bg</item>
+        <item name="colorCard">@color/dark_card_bg</item>
+        <item name="colorTextPrimary">@color/dark_text_primary</item>
+        <item name="colorTextSecondary">@color/dark_text_secondary</item>
+        <item name="colorDivider">@color/dark_divider</item>
+        <item name="colorAccentFill">@color/dark_accent</item>
+        <item name="colorAccentFillPressed">@color/dark_accent_dark</item>
+        <item name="colorControlFill">@color/dark_control_fill</item>
+        <item name="colorControlFillPressed">@color/dark_control_fill_pressed</item>
+        <item name="colorDangerFill">@color/dark_danger</item>
+        <item name="colorDangerFillPressed">@color/dark_danger_dark</item>
+        <item name="colorStatusOk">@color/dark_status_ok</item>
+        <item name="colorStatusOff">@color/dark_status_off</item>
+        <item name="colorStatusError">@color/dark_status_error</item>
+    </style>
+
+    <style name="AppActionBarLight" parent="android:Widget.Holo.Light.ActionBar.Solid">
+        <item name="android:background">@color/light_title_bar</item>
+    </style>
+
+    <style name="AppActionBarDark" parent="android:Widget.Holo.ActionBar.Solid">
+        <item name="android:background">@color/dark_title_bar</item>
+    </style>
+
+    <style name="AppButton" parent="android:Widget.Holo.Button">
+        <item name="android:background">@drawable/btn_secondary</item>
+        <item name="android:textColor">?attr/colorTextPrimary</item>
+        <item name="android:textSize">15sp</item>
+        <item name="android:minHeight">44dp</item>
+        <item name="android:paddingLeft">12dp</item>
+        <item name="android:paddingRight">12dp</item>
+    </style>
+
+    <style name="SectionHeader">
+        <item name="android:textSize">13sp</item>
+        <item name="android:textColor">?attr/colorTextSecondary</item>
+        <item name="android:paddingLeft">4dp</item>
+        <item name="android:paddingTop">20dp</item>
+        <item name="android:paddingBottom">6dp</item>
+    </style>
+
+    <style name="FieldLabel">
+        <item name="android:textSize">14sp</item>
+        <item name="android:textColor">?attr/colorTextSecondary</item>
+        <item name="android:paddingTop">12dp</item>
+        <item name="android:paddingBottom">2dp</item>
+    </style>
+</resources>

@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="autostart_accessibility_desc">帮助打开厂商设置中 PocketCam 的自启动开关，仅在自启动设置页面生效</string>
+</resources>
