@@ -14,16 +14,18 @@ import android.view.View;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.Spinner;
+import android.widget.Switch;
 import android.widget.TextView;
 
 /** Editor for either simple forwarding fields or a complete frpc TOML file, plus kernel control. */
 public class FrpcConfigActivity extends Activity {
     private static final String RISK_NOTICE =
             "通过 frpc 映射后，视频将以未加密的 HTTP 在公网传输。访问凭据不能替代加密，密码和视频内容可能被网络中的第三方看到。\n\n仅在您信任的网络中使用，或自行在 frps 侧配置 TLS。";
-    private EditText server, serverPort, token, remotePort, subdomain, complete;
+    private EditText server, serverPort, token, user, proxyName, remotePort, subdomain, complete;
     private Spinner mappingType;
     private TextView status, kernelStatus;
     private Button toggle;
+    private Switch startWithService;
     private android.view.View frpcDot;
     private final Handler handler = new Handler();
     private boolean polling;
@@ -37,6 +39,8 @@ public class FrpcConfigActivity extends Activity {
         server = (EditText) findViewById(R.id.edit_server);
         serverPort = (EditText) findViewById(R.id.edit_server_port);
         token = (EditText) findViewById(R.id.edit_token);
+        user = (EditText) findViewById(R.id.edit_user);
+        proxyName = (EditText) findViewById(R.id.edit_proxy_name);
         remotePort = (EditText) findViewById(R.id.edit_remote_port);
         subdomain = (EditText) findViewById(R.id.edit_subdomain);
         complete = (EditText) findViewById(R.id.edit_toml);
@@ -46,6 +50,7 @@ public class FrpcConfigActivity extends Activity {
         mappingType = (Spinner) findViewById(R.id.spinner_mapping);
         Button importFile = (Button) findViewById(R.id.btn_import);
         toggle = (Button) findViewById(R.id.btn_toggle);
+        startWithService = (Switch) findViewById(R.id.switch_start_with_service);
         TextView risk = (TextView) findViewById(R.id.risk_link);
 
         String[] types = { "TCP（远程端口）", "HTTP（子域名）" };
@@ -74,6 +79,8 @@ public class FrpcConfigActivity extends Activity {
         server.setOnFocusChangeListener(blurSave);
         serverPort.setOnFocusChangeListener(blurSave);
         token.setOnFocusChangeListener(blurSave);
+        user.setOnFocusChangeListener(blurSave);
+        proxyName.setOnFocusChangeListener(blurSave);
         remotePort.setOnFocusChangeListener(blurSave);
         subdomain.setOnFocusChangeListener(blurSave);
         complete.setOnFocusChangeListener(blurSave);
@@ -82,6 +89,13 @@ public class FrpcConfigActivity extends Activity {
             else startMapping();
         });
         risk.setOnClickListener(v -> showRisk(false));
+        startWithService.setChecked(PreferenceManager.getDefaultSharedPreferences(this)
+                .getBoolean("frpc_start_with_service", false));
+        startWithService.setOnCheckedChangeListener((b, checked) -> {
+            if (!loaded) return;
+            PreferenceManager.getDefaultSharedPreferences(FrpcConfigActivity.this).edit()
+                    .putBoolean("frpc_start_with_service", checked).apply();
+        });
         loaded = true;
     }
 
@@ -188,6 +202,8 @@ public class FrpcConfigActivity extends Activity {
         SharedPreferences p = PreferenceManager.getDefaultSharedPreferences(this);
         server.setText(p.getString("frpc_server", "")); serverPort.setText(p.getString("frpc_server_port", "7000"));
         token.setText(p.getString("frpc_token", "")); remotePort.setText(p.getString("frpc_remote_port", "8080"));
+        user.setText(p.getString("frpc_user", ""));
+        proxyName.setText(p.getString("frpc_proxy_name", ""));
         subdomain.setText(p.getString("frpc_subdomain", ""));
         mappingType.setSelection(p.getString("frpc_mapping_type", "tcp").equals("http") ? 1 : 0);
         complete.setText(p.getString("frpc_toml", ""));
@@ -210,11 +226,18 @@ public class FrpcConfigActivity extends Activity {
                 try { int port = Integer.parseInt(remotePort.getText().toString().trim()); if (port < 1 || port > 65535) throw new NumberFormatException(); }
                 catch (Exception e) { remotePort.setError("端口范围应为 1–65535"); return; }
             }
+            // frp 以 "用户 + 代理名" 唯一标识一条映射，两台设备用同一组会提示 proxy already exists。
+            String owner = user.getText().toString().trim();
+            if (owner.length() > 0 && !owner.matches("[A-Za-z0-9_.-]+")) { user.setError("只能包含字母、数字、下划线、点和连字符"); return; }
+            String name = proxyName.getText().toString().trim();
+            if (name.length() > 0 && !name.matches("[A-Za-z0-9_.-]+")) { proxyName.setError("只能包含字母、数字、下划线、点和连字符"); return; }
         }
         PreferenceManager.getDefaultSharedPreferences(this).edit()
                 .putString("frpc_server", server.getText().toString().trim())
                 .putString("frpc_server_port", serverPort.getText().toString().trim())
                 .putString("frpc_token", token.getText().toString().trim())
+                .putString("frpc_user", user.getText().toString().trim())
+                .putString("frpc_proxy_name", proxyName.getText().toString().trim())
                 .putString("frpc_remote_port", remotePort.getText().toString().trim())
                 .putString("frpc_subdomain", subdomain.getText().toString().trim())
                 .putString("frpc_mapping_type", http ? "http" : "tcp")

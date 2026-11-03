@@ -19,6 +19,11 @@ import android.graphics.Typeface;
 import android.graphics.YuvImage;
 import android.hardware.Camera;
 import android.hardware.SensorManager;
+import android.media.AudioAttributes;
+import android.media.AudioFormat;
+import android.media.AudioManager;
+import android.media.AudioTrack;
+import android.media.MediaPlayer;
 import android.os.BatteryManager;
 import android.os.Build;
 import android.os.Handler;
@@ -28,10 +33,13 @@ import android.preference.PreferenceManager;
 import android.util.Base64;
 import android.util.Log;
 import android.view.OrientationEventListener;
+import java.io.BufferedInputStream;
 import java.io.ByteArrayOutputStream;
+import java.io.EOFException;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.BindException;
 import java.net.InetAddress;
@@ -43,8 +51,10 @@ import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.concurrent.ArrayBlockingQueue;
 
 public class CameraStreamService extends Service implements Camera.PreviewCallback {
@@ -121,6 +131,12 @@ public class CameraStreamService extends Service implements Camera.PreviewCallba
     private final ArrayBlockingQueue<byte[]> pendingFrame = new ArrayBlockingQueue<>(1);
     private final List<OutputStream> mjpegClients = new ArrayList<>();
     private final List<OutputStream> audioClients = new ArrayList<>();
+    /** Push-to-talk: one speaker track reused across overlapping uploads. */
+    private final Object talkLock = new Object();
+    private AudioTrack talkTrack;
+    private int talkTrackRate;
+    private int talkUsers;
+    private Handler talkHandler;
     private final List<FlvClient> flvClients = new ArrayList<>();
     private volatile boolean serving;
     private volatile byte[] latestJpeg;
@@ -230,6 +246,7 @@ public class CameraStreamService extends Service implements Camera.PreviewCallba
             acquireWakeLock();
             KeepAlive.start(this);
             scheduleAppLaunch();
+            startFrpcIfEnabled();
         } catch (Exception e) {
             Log.e(TAG, "start failed", e);
             String message = e instanceof BindException ? "端口 " + port + " 已被占用。" : "启动失败：" + e.getMessage();
@@ -246,6 +263,17 @@ public class CameraStreamService extends Service implements Camera.PreviewCallba
     private static int readPort(SharedPreferences prefs, String key, int fallback) {
         int value = prefs.getInt(key, fallback);
         return value >= 1 && value <= 65535 ? value : fallback;
+    }
+
+    /** Honors the frpc page switch: bring the tunnel up together with the camera service. */
+    private void startFrpcIfEnabled() {
+        SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(this);
+        if (!prefs.getBoolean("frpc_start_with_service", false)) return;
+        if (!FrpcController.hasConfig(prefs)) return;
+        String status = FrpcController.status();
+        if ("starting".equals(status) || "connected".equals(status) || "reconnecting".equals(status)) return;
+        String error = FrpcController.start(this);
+        if (error != null) Log.w(TAG, "frpc auto start failed: " + error);
     }
 
     /** Loads the bundled home page once; it carries the buttons for every supported endpoint. */
@@ -744,17 +772,21 @@ public class CameraStreamService extends Service implements Camera.PreviewCallba
             try {
                 socket.setSoTimeout(0);
                 OutputStream out = socket.getOutputStream();
-                java.io.BufferedReader in = new java.io.BufferedReader(new java.io.InputStreamReader(socket.getInputStream()));
-                String request = in.readLine();
+                // Headers are parsed on the raw stream so the body stays readable afterwards:
+                // talk uploads stream binary PCM straight into the speaker.
+                InputStream in = new BufferedInputStream(socket.getInputStream());
+                String request = readLine(in);
                 if (request == null) { socket.close(); return; }
-                String auth = null, line;
-                while ((line = in.readLine()) != null && line.length() > 0)
-                    if (line.regionMatches(true, 0, "Authorization:", 0, 14)) auth = line.substring(14).trim();
-                String path = request.split(" ").length > 1 ? request.split(" ")[1] : "/";
-                int query = path.indexOf('?');
-                if (query >= 0) path = path.substring(0, query);
-                if (authHeader == null || !authHeader.equals(auth)) { sendUnauthorized(out); return; }
-                serve(path, out);
+                Map<String, String> headers = new HashMap<>();
+                String line;
+                while ((line = readLine(in)) != null && line.length() > 0) {
+                    int colon = line.indexOf(':');
+                    if (colon > 0) headers.put(line.substring(0, colon).trim().toLowerCase(Locale.US),
+                            line.substring(colon + 1).trim());
+                }
+                String target = request.split(" ").length > 1 ? request.split(" ")[1] : "/";
+                if (authHeader == null || !authHeader.equals(headers.get("authorization"))) { sendUnauthorized(out); return; }
+                serve(target, in, headers, out);
             } catch (IOException ignored) {
             } catch (Exception e) {
                 Log.w(TAG, "http request failed", e);
@@ -762,14 +794,31 @@ public class CameraStreamService extends Service implements Camera.PreviewCallba
         }, "http-client").start();
     }
 
+    /** Reads one CRLF-terminated header line from the raw stream; null at end of input. */
+    private static String readLine(InputStream in) throws IOException {
+        StringBuilder sb = new StringBuilder();
+        int c;
+        while ((c = in.read()) != -1) {
+            if (c == '\n') break;
+            if (c != '\r') sb.append((char) c);
+        }
+        if (c == -1 && sb.length() == 0) return null;
+        return sb.toString();
+    }
+
     /**
      * Routes on the last path segment, so the API answers both when called directly and when a
      * reverse proxy mounts the server under a prefix. Generated links stay relative for the same reason.
      */
-    private void serve(String path, OutputStream out) throws IOException {
+    private void serve(String target, InputStream in, Map<String, String> headers, OutputStream out) throws IOException {
+        int query = target.indexOf('?');
+        String path = query >= 0 ? target.substring(0, query) : target;
+        String params = query >= 0 ? target.substring(query + 1) : "";
         String key = lastSegment(path).toLowerCase(Locale.US);
         String parent = parentSegment(path).toLowerCase(Locale.US);
         if (path.equals("/") || path.endsWith("/") || key.equals("index")) { sendHtml(out, indexPage()); return; }
+        if (key.equals("talk")) { serveTalk(in, headers, params, out); return; }
+        if (key.equals("put_voice")) { serveVoiceUpload(in, headers, out); return; }
         if (key.equals("favicon.png") || key.equals("favicon.ico")) { sendFavicon(out); return; }
         if (key.equals("video") || key.equals("stream.mjpg")) { serveMjpeg(out); return; }
         if (key.equals("audio") || key.equals("audio.wav")) { serveAudioWav(out); return; }
@@ -912,6 +961,280 @@ public class CameraStreamService extends Service implements Camera.PreviewCallba
                 try { out.close(); } catch (IOException ignored) { }
                 synchronized (audioClients) { audioClients.remove(out); }
             }
+        }
+    }
+
+    // ------------------------------------------------------------------ push-to-talk
+
+    /** Default talk sample rate; the browser may ask for its own rate via {@code ?rate=}. */
+    private static final int TALK_RATE = 16000;
+    /** Keeps the speaker alive briefly so the tail of a phrase is not cut off. */
+    private static final long TALK_IDLE_RELEASE_MS = 4000;
+
+    private final Runnable talkReleaseRunnable = () -> {
+        synchronized (talkLock) {
+            if (talkUsers == 0) releaseTalkTrack();
+        }
+    };
+
+    /**
+     * Push-to-talk endpoint. The browser PUTs raw PCM16 little-endian mono audio. Browsers that
+     * support streaming request bodies send chunks while the button is held, so playback starts
+     * immediately; others upload one body when the button is released. Chunks go straight into an
+     * AudioTrack, which provides the backpressure that throttles a fast client.
+     */
+    private void serveTalk(InputStream in, Map<String, String> headers, String params, OutputStream out) throws IOException {
+        int rate = talkRate(params);
+        AudioTrack track;
+        synchronized (talkLock) {
+            try {
+                track = acquireTalkTrack(rate);
+            } catch (Exception e) {
+                Log.w(TAG, "talk playback unavailable", e);
+                sendBytes(out, 503, "Service Unavailable", "text/plain;charset=utf-8", "扬声器不可用".getBytes("UTF-8"));
+                return;
+            }
+            talkUsers++;
+        }
+        try {
+            String encoding = headers.get("transfer-encoding");
+            String length = headers.get("content-length");
+            if (encoding != null && encoding.toLowerCase(Locale.US).contains("chunked")) {
+                readChunkedBody(in, track);
+            } else if (length != null) {
+                long size = -1;
+                try { size = Long.parseLong(length); } catch (NumberFormatException ignored) { }
+                readFixedBody(in, track, size);
+            } else {
+                readUntilEof(in, track);
+            }
+            sendText(out, "OK");
+        } finally {
+            synchronized (talkLock) {
+                if (--talkUsers == 0) {
+                    if (talkHandler == null) talkHandler = new Handler(android.os.Looper.getMainLooper());
+                    talkHandler.removeCallbacks(talkReleaseRunnable);
+                    talkHandler.postDelayed(talkReleaseRunnable, TALK_IDLE_RELEASE_MS);
+                }
+            }
+        }
+    }
+
+    /** Accepts {@code rate} between 8 kHz and 48 kHz; anything else falls back to the default. */
+    private static int talkRate(String params) {
+        int at = params.indexOf("rate=");
+        if (at < 0) return TALK_RATE;
+        int end = params.indexOf('&', at);
+        String raw = end < 0 ? params.substring(at + 5) : params.substring(at + 5, end);
+        try {
+            int rate = Integer.parseInt(raw.trim());
+            if (rate >= 8000 && rate <= 48000) return rate;
+        } catch (NumberFormatException ignored) { }
+        return TALK_RATE;
+    }
+
+    private AudioTrack acquireTalkTrack(int rate) throws IOException {
+        if (talkTrack != null && talkTrackRate == rate) return talkTrack;
+        releaseTalkTrack();
+        int min = AudioTrack.getMinBufferSize(rate, AudioFormat.CHANNEL_OUT_MONO, AudioFormat.ENCODING_PCM_16BIT);
+        if (min <= 0) throw new IOException("speaker buffer size unavailable");
+        AudioTrack track;
+        if (Build.VERSION.SDK_INT >= 23) {
+            track = new AudioTrack.Builder()
+                    .setAudioAttributes(new AudioAttributes.Builder()
+                            .setUsage(AudioAttributes.USAGE_MEDIA)
+                            .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
+                            .build())
+                    .setAudioFormat(new AudioFormat.Builder()
+                            .setEncoding(AudioFormat.ENCODING_PCM_16BIT)
+                            .setSampleRate(rate)
+                            .setChannelMask(AudioFormat.CHANNEL_OUT_MONO)
+                            .build())
+                    .setBufferSizeInBytes(min * 2)
+                    .setTransferMode(AudioTrack.MODE_STREAM)
+                    .build();
+        } else {
+            track = new AudioTrack(AudioManager.STREAM_MUSIC, rate, AudioFormat.CHANNEL_OUT_MONO,
+                    AudioFormat.ENCODING_PCM_16BIT, min * 2, AudioTrack.MODE_STREAM);
+        }
+        if (track.getState() != AudioTrack.STATE_INITIALIZED) {
+            track.release();
+            throw new IOException("speaker unavailable");
+        }
+        track.play();
+        talkTrack = track;
+        talkTrackRate = rate;
+        return track;
+    }
+
+    private void releaseTalkTrack() {
+        if (talkTrack == null) return;
+        try { talkTrack.stop(); } catch (Exception ignored) { }
+        try { talkTrack.release(); } catch (Exception ignored) { }
+        talkTrack = null;
+    }
+
+    private void readFixedBody(InputStream in, AudioTrack track, long length) throws IOException {
+        if (length <= 0) return;
+        byte[] buf = new byte[4096];
+        long remaining = length;
+        while (remaining > 0) {
+            int read = in.read(buf, 0, (int) Math.min(buf.length, remaining));
+            if (read <= 0) return;
+            writePcm(track, buf, read);
+            remaining -= read;
+        }
+    }
+
+    private void readUntilEof(InputStream in, AudioTrack track) throws IOException {
+        byte[] buf = new byte[4096];
+        int read;
+        while ((read = in.read(buf)) > 0) writePcm(track, buf, read);
+    }
+
+    private void readChunkedBody(InputStream in, AudioTrack track) throws IOException {
+        byte[] buf = new byte[4096];
+        while (true) {
+            String sizeLine = readLine(in);
+            if (sizeLine == null) return;
+            int semi = sizeLine.indexOf(';');
+            if (semi >= 0) sizeLine = sizeLine.substring(0, semi);
+            int size;
+            try { size = Integer.parseInt(sizeLine.trim(), 16); } catch (NumberFormatException e) { throw new IOException("bad chunk size"); }
+            if (size == 0) {
+                // Consume the trailer so nothing is left for the next request on this socket.
+                String trailer;
+                while ((trailer = readLine(in)) != null && trailer.length() > 0) { }
+                return;
+            }
+            int remaining = size;
+            while (remaining > 0) {
+                int read = in.read(buf, 0, Math.min(buf.length, remaining));
+                if (read <= 0) throw new EOFException();
+                writePcm(track, buf, read);
+                remaining -= read;
+            }
+            readLine(in); // CRLF that terminates the chunk data
+        }
+    }
+
+    /** Writes PCM16 in frame-aligned pieces; a blocking write throttles a client that sends too fast. */
+    private void writePcm(AudioTrack track, byte[] data, int length) {
+        int offset = 0;
+        while (offset < length) {
+            int count = (length - offset) & ~1; // whole 2-byte samples only
+            if (count == 0) return;
+            int written = track.write(data, offset, count);
+            if (written <= 0) return;
+            offset += written;
+        }
+    }
+
+    /**
+     * Compatibility endpoint for the reference Android client, which records a whole phrase and
+     * PUTs one audio/m4a body. The clip is decoded by MediaPlayer instead of the raw PCM path, and
+     * the reply waits for playback to end so the caller knows when the speaker is free again.
+     */
+    private void serveVoiceUpload(InputStream in, Map<String, String> headers, OutputStream out) throws IOException {
+        byte[] body = readBodyBytes(in, headers);
+        if (body.length == 0) {
+            sendBytes(out, 400, "Bad Request", "text/plain;charset=utf-8", "空请求体".getBytes("UTF-8"));
+            return;
+        }
+        File file = new File(getCacheDir(), "voice-" + System.nanoTime() + ".m4a");
+        FileOutputStream fos = new FileOutputStream(file);
+        try {
+            fos.write(body);
+        } finally {
+            fos.close();
+        }
+        String error = playVoiceFile(file);
+        if (!file.delete()) Log.w(TAG, "voice temp file not deleted: " + file.getName());
+        if (error != null) {
+            sendBytes(out, 500, "Internal Server Error", "text/plain;charset=utf-8", error.getBytes("UTF-8"));
+            return;
+        }
+        sendText(out, "OK");
+    }
+
+    /** Collects the request body; handles chunked and fixed length, otherwise reads until EOF. */
+    private byte[] readBodyBytes(InputStream in, Map<String, String> headers) throws IOException {
+        final int limit = 32 * 1024 * 1024;
+        ByteArrayOutputStream sink = new ByteArrayOutputStream();
+        String encoding = headers.get("transfer-encoding");
+        String length = headers.get("content-length");
+        byte[] buf = new byte[8192];
+        if (encoding != null && encoding.toLowerCase(Locale.US).contains("chunked")) {
+            while (true) {
+                String sizeLine = readLine(in);
+                if (sizeLine == null) break;
+                int semi = sizeLine.indexOf(';');
+                if (semi >= 0) sizeLine = sizeLine.substring(0, semi);
+                int size;
+                try { size = Integer.parseInt(sizeLine.trim(), 16); } catch (NumberFormatException e) { throw new IOException("bad chunk size"); }
+                if (size == 0) {
+                    String trailer;
+                    while ((trailer = readLine(in)) != null && trailer.length() > 0) { }
+                    break;
+                }
+                int remaining = size;
+                while (remaining > 0) {
+                    int read = in.read(buf, 0, Math.min(buf.length, remaining));
+                    if (read <= 0) throw new EOFException();
+                    if (sink.size() + read > limit) throw new IOException("body too large");
+                    sink.write(buf, 0, read);
+                    remaining -= read;
+                }
+                readLine(in); // CRLF that terminates the chunk data
+            }
+        } else if (length != null) {
+            long size;
+            try { size = Long.parseLong(length.trim()); } catch (NumberFormatException e) { throw new IOException("bad content length"); }
+            if (size > limit) throw new IOException("body too large");
+            long remaining = size;
+            while (remaining > 0) {
+                int read = in.read(buf, 0, (int) Math.min(buf.length, remaining));
+                if (read <= 0) break;
+                sink.write(buf, 0, read);
+                remaining -= read;
+            }
+        } else {
+            int read;
+            while ((read = in.read(buf)) > 0) {
+                if (sink.size() + read > limit) throw new IOException("body too large");
+                sink.write(buf, 0, read);
+            }
+        }
+        return sink.toByteArray();
+    }
+
+    /** Decodes and plays an uploaded clip; returns null on success, otherwise a failure message. */
+    private String playVoiceFile(File file) {
+        MediaPlayer player = new MediaPlayer();
+        try {
+            if (Build.VERSION.SDK_INT >= 21) {
+                player.setAudioAttributes(new AudioAttributes.Builder()
+                        .setUsage(AudioAttributes.USAGE_MEDIA)
+                        .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
+                        .build());
+            } else {
+                player.setAudioStreamType(AudioManager.STREAM_MUSIC);
+            }
+            player.setDataSource(file.getAbsolutePath());
+            player.prepare();
+            player.start();
+            long duration = player.getDuration();
+            if (duration <= 0) duration = 30000;
+            long deadline = System.currentTimeMillis() + duration + 3000;
+            while (player.isPlaying() && System.currentTimeMillis() < deadline) {
+                try { Thread.sleep(50); } catch (InterruptedException e) { Thread.currentThread().interrupt(); break; }
+            }
+            return null;
+        } catch (Exception e) {
+            Log.w(TAG, "voice playback failed", e);
+            return "音频解码失败";
+        } finally {
+            try { player.release(); } catch (Exception ignored) { }
         }
     }
 
@@ -1473,6 +1796,8 @@ public class CameraStreamService extends Service implements Camera.PreviewCallba
             for (FlvClient client : flvClients) try { client.out.close(); } catch (IOException ignored) { }
             flvClients.clear();
         }
+        if (talkHandler != null) { talkHandler.removeCallbacks(talkReleaseRunnable); talkHandler = null; }
+        synchronized (talkLock) { talkUsers = 0; releaseTalkTrack(); }
         closeCamera();
     }
 

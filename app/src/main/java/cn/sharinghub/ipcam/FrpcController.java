@@ -26,8 +26,13 @@ public final class FrpcController {
             String escaped = token.replace("\\", "\\\\").replace("\"", "\\\"");
             toml.append("auth.token = \"").append(escaped).append("\"\n");
         }
+        // frp 的 user 是客户端级字段，会把它名下的代理名变成 "{user}.{name}"，借此区分多台设备。
+        String user = prefs.getString("frpc_user", "").trim();
+        if (!user.isEmpty()) toml.append("user = \"").append(user).append("\"\n");
         toml.append("\n[[proxies]]\n");
-        toml.append("name = \"pocketcam\"\n");
+        // 代理名在同一用户下必须唯一，否则第二台设备会收到 proxy already exists。
+        String name = prefs.getString("frpc_proxy_name", "").trim();
+        toml.append("name = \"").append(name.isEmpty() ? "pocketcam" : name).append("\"\n");
         String type = prefs.getString("frpc_mapping_type", "tcp");
         toml.append("type = \"").append(type).append("\"\n");
         toml.append("localIP = \"127.0.0.1\"\n");

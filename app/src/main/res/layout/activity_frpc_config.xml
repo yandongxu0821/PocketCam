@@ -51,6 +51,17 @@
                 android:textSize="16sp"
                 android:text="启动公网映射" />
 
+            <Switch
+                android:id="@+id/switch_start_with_service"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:paddingTop="12dp"
+                android:paddingBottom="2dp"
+                android:text="启动相机服务时同时启动 Frpc"
+                android:textSize="15sp"
+                android:textColor="?attr/colorTextPrimary" />
+
             <TextView
                 android:id="@+id/risk_link"
                 android:layout_width="match_parent"
@@ -61,7 +72,7 @@
                 android:textColor="?attr/colorAccentFill" />
         </LinearLayout>
 
-        <TextView style="@style/SectionHeader" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="向导" />
+        <TextView style="@style/SectionHeader" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="向导（标 * 为必填项）" />
 
         <LinearLayout
             android:layout_width="match_parent"
@@ -70,14 +81,17 @@
             android:background="@drawable/bg_card"
             android:paddingLeft="16dp" android:paddingRight="16dp" android:paddingBottom="16dp">
 
-            <TextView style="@style/FieldLabel" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="服务器地址" />
+            <TextView style="@style/FieldLabel" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="服务器地址 *" />
             <EditText android:id="@+id/edit_server" android:layout_width="match_parent" android:layout_height="wrap_content" android:singleLine="true" android:hint="例如 frps.example.com" android:inputType="textUri" />
 
-            <TextView style="@style/FieldLabel" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="服务器端口（默认 7000）" />
+            <TextView style="@style/FieldLabel" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="服务器端口" />
             <EditText android:id="@+id/edit_server_port" android:layout_width="match_parent" android:layout_height="wrap_content" android:singleLine="true" android:inputType="number" />
 
-            <TextView style="@style/FieldLabel" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="认证 Token（可留空）" />
+            <TextView style="@style/FieldLabel" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="认证 Token" />
             <EditText android:id="@+id/edit_token" android:layout_width="match_parent" android:layout_height="wrap_content" android:singleLine="true" android:inputType="textPassword" />
+
+            <TextView style="@style/FieldLabel" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="用户名 User" />
+            <EditText android:id="@+id/edit_user" android:layout_width="match_parent" android:layout_height="wrap_content" android:singleLine="true" android:hint="例如 cam1" android:inputType="text" />
 
             <TextView style="@style/FieldLabel" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="映射方式"  android:layout_marginBottom="8dp"/>
             <Spinner
@@ -85,10 +99,13 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content" />
 
-            <TextView android:id="@+id/label_remote_port" style="@style/FieldLabel" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="远程映射端口" />
+            <TextView style="@style/FieldLabel" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="代理名称 proxies.name" />
+            <EditText android:id="@+id/edit_proxy_name" android:layout_width="match_parent" android:layout_height="wrap_content" android:singleLine="true" android:hint="默认 pocketcam" android:inputType="text" />
+
+            <TextView android:id="@+id/label_remote_port" style="@style/FieldLabel" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="远程映射端口 *" />
             <EditText android:id="@+id/edit_remote_port" android:layout_width="match_parent" android:layout_height="wrap_content" android:singleLine="true" android:inputType="number" />
 
-            <TextView android:id="@+id/label_subdomain" style="@style/FieldLabel" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="子域名（配合 frps 的 subdomainHost）" />
+            <TextView android:id="@+id/label_subdomain" style="@style/FieldLabel" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="子域名（配合 frps 的 subdomainHost）*" />
             <EditText android:id="@+id/edit_subdomain" android:layout_width="match_parent" android:layout_height="wrap_content" android:singleLine="true" android:hint="例如 mycam" android:inputType="text" />
         </LinearLayout>
 

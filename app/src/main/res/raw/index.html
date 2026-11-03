@@ -16,6 +16,9 @@ h1 { font-size: 16px; font-weight: 600; margin: 4px 0 10px; text-align: center; 
 .bar { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; justify-content: center; }
 .btn { background: #2a2a2e; color: #eaeaea; border: 1px solid #3a3a40; border-radius: 8px; padding: 9px 14px; font-size: 14px; cursor: pointer; }
 .btn:active { background: #3a3a42; }
+.btn.talking { background: #b3261e; border-color: #b3261e; color: #fff; }
+.btn:disabled { opacity: .55; cursor: default; }
+#talk { touch-action: none; user-select: none; -webkit-user-select: none; }
 .dropdown { position: relative; }
 .menu { display: none; position: absolute; top: calc(100% + 6px); left: 0; z-index: 20; min-width: 190px; max-height: 240px; overflow: auto; background: #1d1d21; border: 1px solid #3a3a40; border-radius: 8px; padding: 4px 0; }
 .menu.open { display: block; }
@@ -35,6 +38,7 @@ h1 { font-size: 16px; font-weight: 600; margin: 4px 0 10px; text-align: center; 
   <div class="bar">
     <button class="btn" onclick="snapshot()">快照</button>
     <button class="btn" onclick="toggleMute()">声音</button>
+    <button class="btn" id="talk">按住对讲</button>
     <div class="dropdown">
       <button class="btn" onclick="showArchives()">存档 &#9662;</button>
       <div class="menu" id="archives"><ul id="archiveList"></ul></div>
@@ -179,6 +183,137 @@ function toggleMute() {
   if (audio.paused) startAudio();
   audio.muted = !audio.muted;
   show(audio.muted ? '已静音' : '声音已开启');
+}
+
+// --- Push-to-talk ----------------------------------------------------------
+// Hold the button to speak into the device speaker. The page records raw PCM16
+// mono at its own sample rate and PUTs it to /talk: chunked while held when the
+// browser supports streaming request bodies, otherwise one body on release.
+var TALK_RATE = 16000;
+var talk = { active: false };
+
+function talkStreamSupported() {
+  if (typeof ReadableStream === 'undefined') return false;
+  try {
+    new Request(location.href, { method: 'POST', body: new ReadableStream(), duplex: 'half' });
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+
+function pcm16(samples, length) {
+  var out = new Int16Array(length);
+  for (var i = 0; i < length; i++) {
+    var s = samples[i];
+    out[i] = s < -1 ? -32768 : s > 1 ? 32767 : (s < 0 ? s * 32768 : s * 32767);
+  }
+  return out;
+}
+
+function talkStart(event) {
+  if (event) event.preventDefault();
+  if (talk.active) return;
+  if (!window.isSecureContext) {
+    show('浏览器只允许在 HTTPS 或本机地址下录音，当前为 HTTP 访问');
+    return;
+  }
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    show('当前浏览器不支持录音');
+    return;
+  }
+  var ctx;
+  try { ctx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: TALK_RATE }); }
+  catch (e) { try { ctx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e2) { ctx = null; } }
+  if (!ctx) { show('无法启动音频处理'); return; }
+  talk = { active: true, ctx: ctx, stream: null, src: null, proc: null, ctrl: null,
+           streaming: false, chunks: [], rate: ctx.sampleRate || TALK_RATE, muted: audio.muted };
+  var btn = document.getElementById('talk');
+  btn.classList.add('talking');
+  btn.textContent = '松开结束';
+  btn.disabled = true;
+  audio.muted = true; // Keep the device's own sound out of the loop while talking.
+  navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true, channelCount: 1 } })
+    .then(function (stream) {
+      if (!talk.active) { stream.getTracks().forEach(function (t) { t.stop(); }); return; }
+      talk.stream = stream;
+      talkPipeline();
+    })
+    .catch(function (err) {
+      talkStop(false, '无法访问麦克风：' + (err && err.message ? err.message : err));
+    });
+}
+
+function talkPipeline() {
+  var ctx = talk.ctx;
+  talk.streaming = talkStreamSupported();
+  if (talk.streaming) {
+    var body = new ReadableStream({ start: function (controller) { talk.ctrl = controller; } });
+    fetch('talk?rate=' + talk.rate, { method: 'PUT', body: body, duplex: 'half', credentials: 'same-origin' })
+      .then(function (r) { return r.text(); })
+      .then(function (text) { if (text !== 'OK') show(text); })
+      .catch(function () { show('对讲传输中断'); });
+  }
+  talk.src = ctx.createMediaStreamSource(talk.stream);
+  talk.proc = ctx.createScriptProcessor(1024, 1, 1);
+  talk.proc.onaudioprocess = function (e) {
+    if (!talk.active) return;
+    var chunk = pcm16(e.inputBuffer.getChannelData(0), e.inputBuffer.length);
+    if (talk.streaming) {
+      if (talk.ctrl) { try { talk.ctrl.enqueue(new Uint8Array(chunk.buffer)); } catch (err) { } }
+    } else {
+      talk.chunks.push(chunk);
+    }
+  };
+  talk.src.connect(talk.proc);
+  talk.proc.connect(ctx.destination); // Output stays silent; this only keeps the node alive.
+}
+
+function talkStop(event, message) {
+  if (event && event.preventDefault) event.preventDefault();
+  if (!talk.active) return;
+  talk.active = false;
+  var btn = document.getElementById('talk');
+  btn.classList.remove('talking');
+  btn.textContent = '按住对讲';
+  btn.disabled = false;
+  audio.muted = talk.muted;
+  if (talk.proc) talk.proc.onaudioprocess = null;
+  try { talk.src.disconnect(); } catch (e) { }
+  try { talk.proc.disconnect(); } catch (e) { }
+  if (talk.stream) talk.stream.getTracks().forEach(function (t) { t.stop(); });
+  if (talk.streaming) {
+    try { talk.ctrl.close(); } catch (e) { }
+  } else if (talk.chunks.length) {
+    sendTalk(talk.chunks, talk.rate);
+  }
+  if (talk.ctx && talk.ctx.close) { try { talk.ctx.close(); } catch (e) { } }
+  if (message) show(message);
+}
+
+function sendTalk(chunks, rate) {
+  var total = 0, i;
+  for (i = 0; i < chunks.length; i++) total += chunks[i].length;
+  var merged = new Int16Array(total), offset = 0;
+  for (i = 0; i < chunks.length; i++) { merged.set(chunks[i], offset); offset += chunks[i].length; }
+  fetch('talk?rate=' + rate, { method: 'PUT', body: merged.buffer, credentials: 'same-origin' })
+    .then(function (r) { return r.text(); })
+    .then(function (text) { if (text !== 'OK') show(text); })
+    .catch(function () { show('对讲上传失败'); });
+}
+
+var talkButton = document.getElementById('talk');
+talkButton.addEventListener('pointerdown', talkStart);
+talkButton.addEventListener('contextmenu', function (e) { e.preventDefault(); });
+window.addEventListener('pointerup', talkStop);
+window.addEventListener('pointercancel', talkStop);
+window.addEventListener('blur', talkStop);
+document.addEventListener('visibilitychange', function () { if (document.hidden) talkStop(); });
+if (!window.PointerEvent) {
+  // Pointer events cover mouse and touch; keep a fallback for older browsers.
+  talkButton.addEventListener('touchstart', talkStart);
+  window.addEventListener('touchend', talkStop);
+  window.addEventListener('touchcancel', talkStop);
 }
 </script>
 </body>
